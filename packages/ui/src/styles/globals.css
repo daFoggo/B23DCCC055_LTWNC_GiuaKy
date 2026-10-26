@@ -67,55 +67,6 @@
   --font-serif: var(--font-serif);
 }
 
-/*
- * Logo motion: the one exception to "only colors are custom" (docs/design-system.md, Logo).
- * Frame-by-frame (`steps()`) so pixels jump instead of sliding. Use only via AppLogo, always
- * behind `motion-safe:`.
- */
-@theme {
-  --animate-logo-plus: logo-plus 4s steps(1, end) infinite;
-  --animate-logo-cross: logo-cross 4s steps(1, end) infinite;
-  --animate-logo-rise: logo-rise 3s steps(4, end) infinite;
-  --animate-logo-rise-late: logo-rise 3s steps(4, end) 1s infinite;
-  --animate-logo-rise-later: logo-rise 3s steps(4, end) 2s infinite;
-
-  @keyframes logo-plus {
-    0% {
-      opacity: 1;
-    }
-    70% {
-      opacity: 0;
-    }
-    82% {
-      opacity: 1;
-    }
-  }
-  @keyframes logo-cross {
-    0% {
-      opacity: 0;
-    }
-    70% {
-      opacity: 1;
-    }
-    82% {
-      opacity: 0;
-    }
-  }
-  @keyframes logo-rise {
-    0% {
-      opacity: 0;
-      transform: translateY(0);
-    }
-    25% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0;
-      transform: translateY(-3px);
-    }
-  }
-}
-
 /* Colors follow claude.dev. Every other numeric token uses Tailwind's default scale.
    `--accent` is shadcn's hover surface; the orange brand color is `--brand`.
    Use `--brand-ink` when orange is small text (contrast-tuned per theme).

@@ -16,8 +16,7 @@ section when a case is not covered here.
 ## Hard rules (check every className you write)
 
 1. Only colors are custom. Everything numeric uses Tailwind's default scale. **No arbitrary values**
-   (`mt-[54px]`, `text-[13px]`, `grid-cols-[auto_1fr]`, `rounded-[10px]`). Only exception: the logo's
-   `--animate-logo-*` keyframes, used by `AppLogo` alone.
+   (`mt-[54px]`, `text-[13px]`, `grid-cols-[auto_1fr]`, `rounded-[10px]`). No custom keyframes.
 2. Smallest text is `text-xs`. Weights: `font-normal`, `font-medium`.
 3. shadcn components: choose a `size` / `variant` prop. Never set `h-*`, `px-*`, `py-*`, `text-*` on them via
    `className`; layout classes (`w-full`, `mt-*`, `self-*`) are fine.
@@ -87,8 +86,8 @@ anchors use `scroll-mt-24`; the logo scrolls to `0`.
 - Each section is the big TOC: mono `text-sm`, `└` + an icon per link (current glyph `text-brand`; in the icon rail the current icon is brand), max two levels, counts
   `ml-auto text-xs tabular-nums`.
 - Inspector below `xl` becomes `<Sheet side="right">`. Selected row `bg-primary text-primary-foreground`.
-- Metrics are a `dl` row, no stat cards. Orange appears once per screen (the logo's spark does not count).
-- Logo: always `<AppLogo variant size motion />` (doc § Logo), sizes 16/24/32 only, animated (`idle`) by default everywhere.
+- Metrics are a `dl` row, no stat cards. Orange appears once per screen.
+- Logo: always `<AppLogo size />` (doc § Logo), text only, no motion.
 
 ## Type and motion
 
