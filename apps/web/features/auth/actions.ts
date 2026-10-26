@@ -1,5 +1,6 @@
 "use server"
 
+import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
 import { SignInSchema, SignUpSchema } from "@workspace/auth/schemas"
@@ -10,6 +11,12 @@ import {
   SIGN_IN_PATH,
 } from "@/config/routes"
 import { getAuthProvider, type SignUpResult } from "@/lib/auth"
+import {
+  DEMO_COOKIE,
+  DEMO_TTL_SECONDS,
+  createDemoToken,
+  demoAuthSecret,
+} from "@/lib/demo-session"
 import { getErrorMessage } from "@/lib/errors"
 import { publicEnv } from "@/lib/env.public"
 
@@ -108,6 +115,24 @@ export async function signInWithGoogleAction(): Promise<void> {
     if (!provider.isExpectedError(error)) throw error
   }
   redirect(url ?? `${SIGN_IN_PATH}?error=oauth`)
+}
+
+export async function demoSignInAction(
+  _previous: { error?: string },
+  _formData: FormData
+): Promise<{ error?: string }> {
+  const secret = demoAuthSecret()
+  if (!secret) return { error: "Demo login is disabled." }
+
+  const cookieStore = await cookies()
+  cookieStore.set(DEMO_COOKIE, await createDemoToken(secret), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: DEMO_TTL_SECONDS,
+  })
+  redirect(DASHBOARD_PATH)
 }
 
 export async function signOutAction(): Promise<void> {

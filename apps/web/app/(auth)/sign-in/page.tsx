@@ -2,6 +2,8 @@ import type { Metadata } from "next"
 import { Suspense } from "react"
 
 import { SIGN_UP_PATH } from "@/config/routes"
+import { demoAuthSecret } from "@/lib/demo-session"
+import { DemoSignInButton } from "@/features/auth/components/demo-sign-in-button"
 import { FormError } from "@/features/auth/components/form-error"
 import { SignInForm } from "@/features/auth/components/sign-in-form"
 
@@ -75,6 +77,7 @@ export default function SignInPage({
               <OAuthError searchParams={searchParams} />
             </Suspense>
             <SignInForm />
+            {demoAuthSecret() !== null ? <DemoSignInButton /> : null}
             {/* Google is disabled; enable the provider in Supabase, then render `<GoogleSignInButton />`. */}
           </div>
         </AuthBody>

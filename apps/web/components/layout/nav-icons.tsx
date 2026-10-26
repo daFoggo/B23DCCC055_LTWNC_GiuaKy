@@ -1,10 +1,11 @@
-import { IconLayoutDashboard, type Icon } from "@tabler/icons-react"
+import { IconBooks, IconChartBar, type Icon } from "@tabler/icons-react"
 
 import type { NavIconName } from "@/config/navigation"
 
 /** `Record` makes TypeScript fail here when a name is added to `NavIconName` without an icon. */
 const NAV_ICONS: Record<NavIconName, Icon> = {
-  overview: IconLayoutDashboard,
+  library: IconBooks,
+  stats: IconChartBar,
 }
 
 export function NavIcon({ name }: { name: NavIconName }) {

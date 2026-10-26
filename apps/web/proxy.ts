@@ -1,8 +1,9 @@
-import type { NextRequest } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 
 import { redirectWithSession, updateSession } from "@workspace/auth/proxy"
 
 import { AUTH_OPTIONS } from "@/config/auth"
+import { DEMO_COOKIE, readDemoSession } from "@/lib/demo-session"
 import {
   DASHBOARD_PATH,
   AUTH_PAGES,
@@ -17,10 +18,10 @@ import {
  */
 export async function proxy(request: NextRequest) {
   const start = performance.now()
-  const { response, isAuthenticated } = await updateSession(
-    request,
-    AUTH_OPTIONS
-  )
+  const demo = await readDemoSession(request.cookies.get(DEMO_COOKIE)?.value)
+  const { response, isAuthenticated } = demo
+    ? { response: NextResponse.next({ request }), isAuthenticated: true }
+    : await updateSession(request, AUTH_OPTIONS)
   const duration = Math.max(0, performance.now() - start).toFixed(2)
   response.headers.set(
     "Server-Timing",

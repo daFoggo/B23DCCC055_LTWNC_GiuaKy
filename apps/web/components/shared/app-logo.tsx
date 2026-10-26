@@ -31,7 +31,7 @@ export function AppLogo({
           textClassName
         )}
       >
-        next-mono-base
+        Mini Library
       </span>
     </span>
   )

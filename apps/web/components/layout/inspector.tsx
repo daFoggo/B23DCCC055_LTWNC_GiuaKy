@@ -61,13 +61,19 @@ export function InspectorProvider({ children }: { children: React.ReactNode }) {
 }
 
 /** `[I] INSPECTOR` in the main header. */
-export function InspectorCommand({ className }: { className?: string }) {
+export function InspectorCommand({
+  className,
+  label = "Inspector",
+}: {
+  className?: string
+  label?: string
+}) {
   const { open, sheetOpen, wide, toggle } = useInspector()
   useHotkey("i", toggle)
   return (
     <HeaderCommand
       hotkey="i"
-      label="Inspector"
+      label={label}
       pressed={wide ? open : sheetOpen}
       onClick={toggle}
       className={className}

@@ -19,7 +19,7 @@ export function AuthAside({ children }: { children: React.ReactNode }) {
       </div>
       {/* Same height as the header so the showcase stays vertically centered. */}
       <div className="flex h-24 shrink-0 items-center justify-between font-mono text-xs text-ink-3">
-        <span>© 2026 Next Mono Base</span>
+        <span>© 2026 Mini Library</span>
         <ThemeCommand />
       </div>
     </aside>
