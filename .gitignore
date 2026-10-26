@@ -56,3 +56,5 @@ next-env.d.ts
 
 # admin e2e saved sessions
 apps/admin/e2e/.auth/
+
+.vercel
