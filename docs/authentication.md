@@ -1,0 +1,97 @@
+# Authentication
+
+How authentication works in the apps (`apps/web`, and `apps/admin` from phase 1b) and why. The code lives in
+`packages/auth` (`@workspace/auth`) and `packages/db` (`@workspace/db`) so every app shares it.
+Applies to Next.js 16.4 with Cache Components enabled.
+
+## 1. Overview
+
+One provider per deployment, chosen by `AUTH_PROVIDER`; it also picks the data path (the whole "stack", see
+[providers.md](providers.md) for switching and the seams):
+
+| Provider | Description | Session lives in |
+|---|---|---|
+| `better-auth` | Self-hosted auth backed by PostgreSQL `auth` schema; issues EdDSA JWTs via JWKS for FastAPI | Secure httpOnly session cookies handled by Better Auth |
+| `supabase` | Supabase Auth via `@supabase/ssr`; ES256 JWT checked locally with `getClaims()`; data through PostgREST + RLS | `sb-<ref>-auth-token` cookies, refreshed only in `proxy.ts` |
+
+Both implement `AuthProvider` and expose `Session { userId, accessToken, role, name, email, calendar? }`, so the DAL,
+Server Actions and data clients interact through a standard, decoupled contract. The base can run on `supabase`; the
+Better Auth + FastAPI stack stays in the base ([providers.md](providers.md)).
+
+Principles:
+
+1. **No network call to learn who the user is on each request**: sessions are validated locally via the session cookie and verified via cached JWKS on the FastAPI backend.
+2. **Tokens are refreshed transparently in `proxy.ts`**: Server Components cannot write cookies; proxy manages session extension.
+3. **Authorize next to the data** (DAL, Server Actions), not in layouts; `proxy.ts` performs optimistic redirects.
+4. **Server Actions are public endpoints**: each authenticates and validates its own input.
+5. **Per-user data uses `"use cache: private"`**; secrets never become cache keys or tags. The DAL's `getSession()` is
+   private too, so all queries in one request share a single session read and token mint (not one per cache scope).
+
+## 2. Architecture
+
+```
+Browser ─cookie─▶ proxy.ts ─▶ updateSession (Better Auth): decrypt/refresh, set cookies, isAuthenticated
+                     ▼
+   Server Component / Action / Route Handler ─▶ lib/dal.ts (getSession · verifySession · verifySessionFresh)
+                     ▼
+        getAuthProvider() ─▶ packages/auth/src/{better-auth,supabase}/server.ts
+                     ▼
+         apiFetch ─Bearer JWT─▶ FastAPI Backend (/v1/*)
+                                  ▼
+                              JWKS (EdDSA) verification at backend
+```
+
+Paths in `apps/web/` unless they start with `packages/`:
+- `proxy.ts`: calls `updateSession(request, AUTH_OPTIONS)` from `@workspace/auth/proxy`, which refreshes the active
+  provider's session; `redirectWithSession` keeps the refreshed cookies on redirects.
+- `config/auth.ts`: `AUTH_OPTIONS` (this app's cookie name); `lib/auth.ts`: `getAuthProvider()` bound to it.
+- `packages/auth/src/better-auth/auth.ts`: Better Auth instance with Postgres pool (`search_path=auth`), JWT plugin with EdDSA JWKS, `nextCookies()`.
+- `packages/auth/src/better-auth/server.ts`: `createBetterAuthProvider(options)` implementing `AuthProvider`.
+- `packages/auth/src/supabase/{server,proxy}.ts`: `createSupabaseProvider(options)`; `getClaims()` verifies identity, `getUser()` backs
+  `verifySessionFresh`, `getSession()` only forwards the already verified token. `app/auth/callback/route.ts` finishes OAuth.
+  When a Custom Access Token Hook adds `timezone`, `week_start`, `adopted_on` claims they become `Session.calendar`
+  ([providers.md](providers.md) §5); `refreshSession()` reissues the token after settings change (`refreshSessionClaims()`
+  in the DAL).
+- `@workspace/db/server`: `createDataClient(accessToken)` for feature data on the Supabase stack (RLS applies).
+- `packages/auth/src/better-auth/proxy.ts`: cookie refresh during routing.
+- `app/api/auth/[...all]/route.ts`: `createBetterAuthHandler(AUTH_OPTIONS)` (404 on the Supabase stack).
+- `lib/http.ts`: `apiFetch` sending Bearer JWT to FastAPI backend (`API_BASE_URL`).
+
+## 3. JWT & JWKS Verification in FastAPI
+
+FastAPI (`your FastAPI backend`) verifies JWTs using PyJWKClient / PyJWT:
+1. `GET /api/auth/jwks` serves the public Ed25519 keys published by Better Auth.
+2. FastAPI caches keys and validates `sub`, `aud` (`API_AUDIENCE`), `iss` (`BETTER_AUTH_URL`), and `exp`.
+3. Injected `CurrentUser(id, email, role)` dependency is available across all protected endpoints.
+
+## Shared packages, per-app cookies and roles
+
+| Export | What it gives |
+| :--- | :--- |
+| `@workspace/auth/config` | `authConfig`: the `AUTH_PROVIDER` union and each stack's env (not `server-only`; the proxy reads it) |
+| `@workspace/auth/server` | `getAuthProvider(options)`: the active provider for one app (`server-only`) |
+| `@workspace/auth/proxy` | `updateSession(request, options)`, `redirectWithSession(url, session)` |
+| `@workspace/auth/better-auth-handler` | `createBetterAuthHandler(options)` for `app/api/auth/[...all]` |
+| `@workspace/auth/permissions` | `Role`, `hasPermission`, `parseRole`, `isStaff` |
+| `@workspace/auth/types`, `/schemas` | `Session`, `AuthProvider`, `AuthOptions`; `SignInSchema`, `SignUpSchema` |
+| `@workspace/db/{public,server,errors,format,types}` | Supabase clients (`createPublicClient` for `"use cache"`, `createDataClient(token)` for RLS as the user), `unwrap`, `DataError`, `formatVnd`, `slugify`, generated `Database` |
+
+**One cookie per app.** `AuthOptions.cookieName` becomes the Supabase cookie name (`cookieOptions.name`) and the Better
+Auth cookie prefix (`advanced.cookiePrefix`). The web app uses `nmb-web-auth`, the admin `nmb-admin-auth`: in dev both
+run on `localhost` (ports do not separate cookies), and in production they sit on different domains anyway, so signing
+in or out of one never touches the other.
+
+**Roles.** `customer` (default, and the fallback for any missing or unknown value), `editor` (content and records,
+may open the admin), `admin` (editor plus settings and staff). Supabase stores the role in `app_metadata.role`, which
+only an admin path can write; never authorize from `user_metadata`. RLS reads the same claim from the JWT, so a role
+change applies after the user's token refreshes (sign out and back in to see it at once).
+
+**First admin (once, by hand).** In the Supabase SQL editor:
+
+```sql
+update auth.users
+set raw_app_meta_data = raw_app_meta_data || '{"role":"admin"}'
+where email = '<email>';
+```
+
+Then sign out and back in. Later staff sign up on the admin and an admin grants `editor` or `admin` there.
